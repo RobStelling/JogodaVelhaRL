@@ -7,18 +7,38 @@ from collections import Counter
 VAZIA = 0
 X = 1
 O = 4
+
+# Resultados, valores são referência à implementação
+# dos leds do Arduino : VELHA -> V, XGANHOU -> X, OGANHOU -> O
 DEUVELHA = int('0b010101101', 2)
 XGANHOU = int('0b101010101', 2)
 OGANHOU = int('0b111101111', 2)
 
+# Tamanho do tabuleiro, internamente ele é representado como um vetor de 9 posições e
+# não uma matriz 3x3
 LINHAS = 3
 COLUNAS = 3
 NUM_CASAS = LINHAS * COLUNAS
 
+# Hiperparâmetros do modelo
+# TAXA_EXPLORACAO é a frequência com que o modelo tenta alternativas não previstas
+# TAXA_APRENDIZADO é o peso entre o valor do estado atual e o valor da recompensa
+# GAMMA é o desconto dado à recompensa
+# LIMITE_EXPLORACAO deve ser usado apenas pelo modelo em simulações e jogo, mas não em treino
 TAXA_EXPLORACAO = 0.3
 TAXA_APRENDIZADO = 0.1
 GAMMA = 0.8
+LIMITE_EXPLORACAO = 0.0
 
+# Recompensas a propagar
+# Velha para quem inicia tem uma recompensa melhor que Velha para quem joga depois
+# O jogador com X sempre inicia o jogo
+VITORIA = 1.0
+DERROTA = 0.0
+VELHAX = 0.1
+VELHAO = 0.5
+
+# Prefixo dos nomes dos arquivos de política ao serem salvos
 PREFIXO_POLITICA = "p_"
 
 
@@ -147,14 +167,14 @@ class jogoDaVelha:
         """
         resultado = self.resultado()
         if resultado == XGANHOU:
-            self.X.propagaRecompensa(1)
-            self.O.propagaRecompensa(0)
+            self.X.propagaRecompensa(VITORIA)
+            self.O.propagaRecompensa(DERROTA)
         elif resultado == OGANHOU:
-            self.X.propagaRecompensa(0)
-            self.O.propagaRecompensa(1)
+            self.X.propagaRecompensa(DERROTA)
+            self.O.propagaRecompensa(VITORIA)
         else: # Deu velha
-            self.X.propagaRecompensa(0.1)
-            self.O.propagaRecompensa(0.5)
+            self.X.propagaRecompensa(VELHAX)
+            self.O.propagaRecompensa(VELHAO)
 
     def partida(self, saida=True):
         """Jogo entre dois jogadores
@@ -217,7 +237,7 @@ class jogoDaVelha:
                 valor = self.tabuleiro[i*COLUNAS + j]
                 saida += simbolo[valor] + " | "
             print(saida)
-        print('-------------')
+        print('-------------', flush=True)
 
 
 def valorEstado(estados, posicao):
@@ -239,7 +259,7 @@ class Maquina():
                  taxa_exploracao=TAXA_EXPLORACAO,
                  taxa_aprendizado=TAXA_APRENDIZADO,
                  gamma=GAMMA,
-                 limite_exploracao=0.0,
+                 limite_exploracao=LIMITE_EXPLORACAO,
                  depuracao=False):
         """Intancia o objeto Maquina
         Nome: usado para salvar/recuperar as políticas e também para representar o jogador
@@ -290,20 +310,6 @@ class Maquina():
                 print(max, self.limite_exploracao, valores_hash)
             alternativas = [opcao['movimento'] for opcao in valores_hash if (max-opcao['valor']) <= self.limite_exploracao]
             jogada = sample(alternativas, 1)
-            #valor_maximo = float('-inf')
-            # Passa por todas as casas vazias para escolher a ação
-            # que maximiza a recompensa
-            #for c in casasLivres:
-            #    proximo_tabuleiro = tabuleiro.copy()
-            #    proximo_tabuleiro[c] = jogador
-            #    hash_proximo_tabuleiro = geraHashTabuleiro(proximo_tabuleiro)
-            #    valor = valorEstado(self.valores_estado, hash_proximo_tabuleiro)
-            #    if self.depuracao:
-            #        print(f'{proximo_tabuleiro}: {valor}')
-            #    if valor > valor_maximo:
-            #        valor_maximo = valor
-            #        jogada = c
-
         return jogada
     
     def acrescentaEstado(self, estado):
