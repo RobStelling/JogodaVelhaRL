@@ -1,7 +1,10 @@
 import numpy as np
 import pickle
-from random import sample
+
 from collections import Counter
+from pathlib import Path
+from random import sample
+
 
 # Valores para casa vazia, jogador X e jogador O
 # X e O são potências de 2, ou seja, usam bits diferentes
@@ -43,6 +46,7 @@ VELHAO = 0.5
 # Prefixo dos nomes dos arquivos de política ao serem salvos
 # p_: Política
 # .pjv: Política do Jogo da Velha
+PASTA_MODELOS = "modelos"
 PREFIXO_POLITICA = "p_"
 EXTENSAO_POLITICA = "pjv"
 
@@ -335,13 +339,25 @@ class Maquina():
 
     def salvaPolitica(self, prefixo=PREFIXO_POLITICA):
         """Salva uma política para uso futuro"""
-        with open(f'{prefixo}{str(self.nome)}.{EXTENSAO_POLITICA}', 'wb' ) as arquivo:
-            pickle.dump(self.valores_estado, arquivo)
+        pasta = Path(f'./{PASTA_MODELOS}')
+        if not pasta.exists():
+            pasta.mkdir()
+        if pasta.is_dir():
+            nome_arquivo = pasta / f'{prefixo}{str(self.nome)}.{EXTENSAO_POLITICA}' 
+            with open(nome_arquivo, 'wb' ) as arquivo:
+                pickle.dump(self.valores_estado, arquivo)
+        else:
+            raise ValueError(f"Não consigo criar arquivos em {pasta}")
 
     def carregaPolitica(self, politica):
         """Carrega uma política para jogar ou continuar um treinamento"""
-        with open(f'{politica}.{EXTENSAO_POLITICA}', 'rb') as arquivo:
-            self.valores_estado = pickle.load(arquivo)
+        pasta = Path(f'./{PASTA_MODELOS}')
+        nome_arquivo = pasta / f'{politica}.{EXTENSAO_POLITICA}'
+        if nome_arquivo.exists():
+            with open(nome_arquivo, 'rb') as arquivo:
+                self.valores_estado = pickle.load(arquivo)
+        else:
+            raise ValueError(f"Política {politica} não existe!")
 
 class Humano:
     """Classe que representa as ações de um jogador humano"""
