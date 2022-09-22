@@ -4,6 +4,8 @@ from random import sample
 from collections import Counter
 
 # Valores para casa vazia, jogador X e jogador O
+# X e O são potências de 2, ou seja, usam bits diferentes
+# e a operação X & O == 0
 VAZIA = 0
 X = 1
 O = 4
@@ -39,7 +41,10 @@ VELHAX = 0.1
 VELHAO = 0.5
 
 # Prefixo dos nomes dos arquivos de política ao serem salvos
+# p_: Política
+# .pjv: Política do Jogo da Velha
 PREFIXO_POLITICA = "p_"
+EXTENSAO_POLITICA = "pjv"
 
 
 def geraHashTabuleiro(posicao):
@@ -61,8 +66,7 @@ class jogoDaVelha:
     # X sempre começa
     def __init__(self, jogadorX, jogadorO):
         self.tabuleiro = np.zeros(NUM_CASAS, dtype=int)
-        self.X = jogadorX
-        self.O = jogadorO
+        self.jogador = {X: jogadorX, O: jogadorO}
         self.terminou = False
         # X sempre começa
         self.vez = X
@@ -131,11 +135,11 @@ class jogoDaVelha:
                 print(f"Rodadas: {rodada}")
             while True:
                 alternativas = self.casasLivres()
-                jogador = self.X if self.vez == X else self.O
-                jogada = jogador.escolheJogada(alternativas, self.tabuleiro, self.vez)
+                vez = self.vez
+                jogada = self.jogador[vez].escolheJogada(alternativas, self.tabuleiro, vez)
                 self.jogada(jogada)
                 hash_tabuleiro = geraHashTabuleiro(self.tabuleiro)
-                jogador.acrescentaEstado(hash_tabuleiro)
+                self.jogador[vez].acrescentaEstado(hash_tabuleiro)
 
                 # Se o jogo terminou (X venceu, O venceu ou velha)
                 # propaga as recompensas pelos estados,
@@ -143,8 +147,8 @@ class jogoDaVelha:
                 if self.resultado() is not None:
                     self.recompensa()
                     self.reinicia()
-                    self.X.reinicia()
-                    self.O.reinicia()
+                    self.jogador[X].reinicia()
+                    self.jogador[O].reinicia()
                     break
 
         print(f"Treinamento finalizado: {rodadas} rodadas")
@@ -167,14 +171,14 @@ class jogoDaVelha:
         """
         resultado = self.resultado()
         if resultado == XGANHOU:
-            self.X.propagaRecompensa(VITORIA)
-            self.O.propagaRecompensa(DERROTA)
+            self.jogador[X].propagaRecompensa(VITORIA)
+            self.jogador[O].propagaRecompensa(DERROTA)
         elif resultado == OGANHOU:
-            self.X.propagaRecompensa(DERROTA)
-            self.O.propagaRecompensa(VITORIA)
+            self.jogador[X].propagaRecompensa(DERROTA)
+            self.jogador[O].propagaRecompensa(VITORIA)
         else: # Deu velha
-            self.X.propagaRecompensa(VELHAX)
-            self.O.propagaRecompensa(VELHAO)
+            self.jogador[X].propagaRecompensa(VELHAX)
+            self.jogador[O].propagaRecompensa(VELHAO)
 
     def partida(self, saida=True):
         """Jogo entre dois jogadores
@@ -185,11 +189,13 @@ class jogoDaVelha:
         """
         while not self.terminou:
             alternativas = self.casasLivres()
-            jogador = self.X if self.vez == X else self.O
-            if jogador.tipo == "Computador":
-                jogada = jogador.escolheJogada(alternativas, self.tabuleiro, self.vez)
+            vez = self.vez
+            if self.jogador[vez].tipo == "Computador":
+                jogada = self.jogador[vez].escolheJogada(alternativas, self.tabuleiro, vez)
             else:
-                jogada = jogador.escolheJogada(alternativas)
+                jogada = self.jogador[vez].escolheJogada(alternativas)
+            # O método self.jogada altera o jogador da vez (self.vez),
+            # por isso o valor self.vez é guardado na variável vez
             self.jogada(jogada)
             if (saida):
                 self.mostraTabuleiro()
@@ -201,7 +207,7 @@ class jogoDaVelha:
                     if resultado == DEUVELHA:
                         print("Deu velha!")
                     else:
-                        print(f"{jogador.nome} venceu!")
+                        print(f"{self.jogador[vez].nome} venceu!")
     
         self.reinicia()
         return resultado
@@ -212,16 +218,16 @@ class jogoDaVelha:
         """
         totalizacao = Counter()
         tabuleiros = Counter()
-        for partida in range(partidas):
+        for _ in range(partidas):
             while not self.terminou:
                 alternativas = self.casasLivres()
-                jogador = self.X if self.vez == X else self.O
-                jogada = jogador.escolheJogada(alternativas, self.tabuleiro, self.vez)
+                vez = self.vez
+                jogada = self.jogador[vez].escolheJogada(alternativas, self.tabuleiro, vez)
                 self.jogada(jogada)
                 resultado = self.resultado()
                 if resultado is not None:
                     # Então o jogo acabou
-                    totalizacao['Velha' if resultado == DEUVELHA else jogador.nome]+=1
+                    totalizacao['Velha' if resultado == DEUVELHA else self.jogador[vez].nome]+=1
                     tabuleiros[geraHashTabuleiro(self.tabuleiro)]+=1
         
             self.reinicia()
@@ -329,12 +335,12 @@ class Maquina():
 
     def salvaPolitica(self, prefixo=PREFIXO_POLITICA):
         """Salva uma política para uso futuro"""
-        with open(f'{prefixo}{str(self.nome)}', 'wb' ) as arquivo:
+        with open(f'{prefixo}{str(self.nome)}.{EXTENSAO_POLITICA}', 'wb' ) as arquivo:
             pickle.dump(self.valores_estado, arquivo)
 
     def carregaPolitica(self, politica):
         """Carrega uma política para jogar ou continuar um treinamento"""
-        with open(politica, 'rb') as arquivo:
+        with open(f'{politica}.{EXTENSAO_POLITICA}', 'rb') as arquivo:
             self.valores_estado = pickle.load(arquivo)
 
 class Humano:
