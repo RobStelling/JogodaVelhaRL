@@ -2,6 +2,7 @@ import numpy as np
 import pickle
 
 from collections import Counter
+from copy import deepcopy
 from pathlib import Path
 from random import sample
 
@@ -358,6 +359,20 @@ class Maquina():
                 self.valores_estado = pickle.load(arquivo)
         else:
             raise ValueError(f"Política {politica} não existe!")
+
+    def combinaESalvaPolitica(self, politica2, nome, prefixo=PREFIXO_POLITICA):
+        politica = deepcopy(self)
+        politica.nome = nome
+        politica.valores_estado = {**self.valores_estado, **politica2.valores_estado}
+        pasta = Path(f'./{PASTA_MODELOS}')
+        if not pasta.exists():
+            pasta.mkdir()
+        if pasta.is_dir():
+            nome_arquivo = pasta / f'{prefixo}{nome}.{EXTENSAO_POLITICA}'
+            with open(nome_arquivo, 'wb') as arquivo:
+                pickle.dump(politica.valores_estado, arquivo)
+        else:
+            raise ValueError(f"Não consigo criar arquivos em {pasta}")
 
 class Humano:
     """Classe que representa as ações de um jogador humano"""
