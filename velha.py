@@ -361,6 +361,10 @@ class Maquina():
             raise ValueError(f"Política {politica} não existe!")
 
     def combinaESalvaPolitica(self, politica2, nome, prefixo=PREFIXO_POLITICA):
+        """Combina duas políticas em uma e salva valores_estado
+        O objetivo é combinar duas políticas, uma para X e uma para O em uma só política, já que as
+        tuplas (hashTabuleiro, valor) são mutualmente excludentes nas políticas para X e O
+        """
         politica = deepcopy(self)
         politica.nome = nome
         politica.valores_estado = {**self.valores_estado, **politica2.valores_estado}
