@@ -1,3 +1,5 @@
+# velha.py - Implementação de engine para jogar o jogo da velha utilizando Reinforcement Learning - Q-Learning.
+#
 import numpy as np
 import pickle
 
@@ -26,11 +28,11 @@ LINHAS = 3
 COLUNAS = 3
 NUM_CASAS = LINHAS * COLUNAS
 
-# Hiperparâmetros do modelo
-# TAXA_EXPLORACAO é a frequência com que o modelo tenta alternativas não previstas
+# Hiperparâmetros da política
+# TAXA_EXPLORACAO é a frequência com que o política tenta alternativas não previstas
 # TAXA_APRENDIZADO é o peso entre o valor do estado atual e o valor da recompensa
 # GAMMA é o desconto dado à recompensa
-# LIMITE_EXPLORACAO deve ser usado apenas pelo modelo em simulações e jogo, mas não em treino
+# LIMITE_EXPLORACAO deve ser usado apenas pela política em simulações e jogo, mas não em treino
 TAXA_EXPLORACAO = 0.3
 TAXA_APRENDIZADO = 0.1
 GAMMA = 0.8
@@ -47,18 +49,48 @@ VELHAO = 0.5
 # Prefixo dos nomes dos arquivos de política ao serem salvos
 # p_: Política
 # .pjv: Política do Jogo da Velha
-PASTA_MODELOS = "modelos"
+PASTA_POLITICAS = "politicas"
 PREFIXO_POLITICA = "p_"
 EXTENSAO_POLITICA = "pjv"
 
+# Esta implementação do jogo da velha com Reinforcement Learning (Q-learning) é feita com 3 classes.
+#
+# jogodaVelha:
+# Nessa classe temos a representação do tabuleiro, métodos para treinamento de políticas (entre duas políticas),
+# métodos para partidas (entre pessoas e políticas ou mesmo entre políticas) e simulações (entre políticas)
+#
+#  Maquina:
+# Classe que representa uma política que será treinada
+# 
+# Humano:
+# Classe que representa um jogador humano
+#
+# Humano e Maquina poderiam ser classe e subclasse porém creio que a implementação é mais simples e intuitiva
+# com duas classes separadas
+#
+# O 'coração' do Q-learning acontece nos métodos recompensa da classe jogoDaVelha e no método
+# propagaRecompensa da classe Máquina. Os dados sáo preservados no campo valores_estado da classe Máquina.
+# O espaço de estados é finito mas não é necessário preencher a matriz de estados com 0 em todas as
+# posições ao iniciar o treinamento. Um estado que não exista em valores_estado é assumido como 0.
+# O método recompensa (jogoDaVelha) indica os valores que devem ser propagados por todos os movimentos a partir de uma partida de
+# treinamento que terminou
+# O método propagaRecompensa (Maquina) efetivamente propaga a premiação por todos os estados da partida que acabou de ser jogada
+#
+# Ao fim de cada partida de treinamento os valores de recompensa são propagados por todas as posições que ocorreram no jogo, dando
+# prêmios correspondentes ao jogadores de X e O. As políticas para X e O são treinadas e preservadas em separado mas é possível,
+# ao fim do treinamento, juntar as políticas e salvá-las como se fosse uma só (método combinaESalvaPolitica), gerando assim uma
+# política que joga como X e como O.
+# Como curiosidade, se usarmos uma política treinada apenas como X para jogar como O teremos um comportamento randômico da política,
+# porque como os estados do ponto de vista do jogador O não existem na política para X, todos os valores de Q para essses estados
+# serão 0.
 
 def geraHashTabuleiro(posicao):
     return str(posicao)
 
 class jogoDaVelha:
-    """Classe para treinamento de modelo com reinforcement learning de modelo do jogo da velha
-    A classe também pode ser usada para jogos entre humanos, entre humano e modelos e entre modelos
-    A sua inicialização pede uma classe para cada um dos jogadores/modelos envolvidos
+    """Classe para treinamento de políticas com reinforcement learning do jogo da velha
+    A classe também pode ser usada para jogos entre humanos, entre humano e políticas e entre políticas
+    A sua inicialização pede uma classe para cada um dos jogadores/políticas envolvidos
     Assume que o primeiro jogador inicia e representa o seus movimentos com X
     Os movimentos do adversário são representados com O
     """
@@ -78,7 +110,7 @@ class jogoDaVelha:
 
     def reinicia(self):
         """Reinicializa as condições do jogo, mantendo os mesmos jogadores
-        Usado normalmente durante o treinamento do modelo
+        Usado normalmente durante o treinamento da política
         """
         self.tabuleiro = np.zeros(NUM_CASAS, dtype=int)
         self.terminou = False
@@ -187,7 +219,7 @@ class jogoDaVelha:
 
     def partida(self, saida=True):
         """Jogo entre dois jogadores
-        Podem ser dois modelos, um modelo e um humano ou dois humanos
+        Podem ser duas políticas, uma política e um humano ou dois humanos
         Se saida == True então mostrará o tabuleiro com os lances efetuados
         Se pelo menos um dos jogadores for humano é recomendável que a flag saida seja True
         Reinicia as condições do jogo ao fim da partida
@@ -262,8 +294,8 @@ def valorEstado(estados, posicao):
     return valor
 
 class Maquina():
-    """Classe para representar um modelo de jogo da velha
-    Utilizado tanto no treinamento com reinforcement learning do modelo quanto em partidas contra outros adversários
+    """Classe para representar uma política de jogo da velha
+    Utilizado tanto no treinamento com reinforcement learning da política quanto em partidas contra outros adversários
     Para o treinamento espera como entrada uma taxa de exploração, uma taxa de aprendizado e um fator de desconto gamma
     """
     def __init__(self, nome,
@@ -274,7 +306,7 @@ class Maquina():
                  depuracao=False):
         """Intancia o objeto Maquina
         Nome: usado para salvar/recuperar as políticas e também para representar o jogador
-        Tipo: indica se é um modelo ou um humano
+        Tipo: indica se é uma  política ou um humano
         Estados lista os estados do jogo atual
         Taxa_aprendizado: peso utilizado na propagação das recompensas
         Taxa_exploracao: percentual de exploracao de alternativas fora da política atual
@@ -292,7 +324,7 @@ class Maquina():
         self.valores_estado = {}
 
     def reinicia(self):
-        """Reinicia o modelo para a próxima partida
+        """Reinicia a política para a próxima partida
         Apenas descarta os estados do jogo atual"""
         self.estados = []
 
@@ -313,13 +345,17 @@ class Maquina():
 
         if np.random.uniform(0, 1) <= self.taxa_exploracao:
             # Executa ação randômica de acordo com a taxa de exploração
+            # se a taxa de exploração for 0.0 então todas as ações virão da
+            # política
             jogada = np.random.choice(casasLivres)
         else:
             valores_hash = geraAlternativas(self.valores_estado, tabuleiro, casasLivres, jogador)
             max = valores_hash[0]['valor']
             if self.depuracao:
                 print(max, self.limite_exploracao, valores_hash)
+            # Seleciona alternativas de lances, se valor >= max-limite_exploração
             alternativas = [opcao['movimento'] for opcao in valores_hash if (max-opcao['valor']) <= self.limite_exploracao]
+            # Escolhe uma opção aleatoriamente
             jogada = sample(alternativas, 1)
         return jogada
     
@@ -340,7 +376,7 @@ class Maquina():
 
     def salvaPolitica(self, prefixo=PREFIXO_POLITICA):
         """Salva uma política para uso futuro"""
-        pasta = Path(f'./{PASTA_MODELOS}')
+        pasta = Path(f'./{PASTA_POLITICAS}')
         if not pasta.exists():
             pasta.mkdir()
         if pasta.is_dir():
@@ -352,7 +388,7 @@ class Maquina():
 
     def carregaPolitica(self, politica):
         """Carrega uma política para jogar ou continuar um treinamento"""
-        pasta = Path(f'./{PASTA_MODELOS}')
+        pasta = Path(f'./{PASTA_POLITICAS}')
         nome_arquivo = pasta / f'{politica}.{EXTENSAO_POLITICA}'
         if nome_arquivo.exists():
             with open(nome_arquivo, 'rb') as arquivo:
@@ -368,7 +404,7 @@ class Maquina():
         politica = deepcopy(self)
         politica.nome = nome
         politica.valores_estado = {**self.valores_estado, **politica2.valores_estado}
-        pasta = Path(f'./{PASTA_MODELOS}')
+        pasta = Path(f'./{PASTA_POLITICAS}')
         if not pasta.exists():
             pasta.mkdir()
         if pasta.is_dir():
@@ -399,20 +435,20 @@ class Humano:
 
 if __name__ == "__main__":
     # Exemplo de treinamento e jogo
-    # Define dois modelos que serão treinados
-    modeloX = Maquina("X")
-    modeloO = Maquina("O")
+    # Define duas políticas que serão treinadas
+    politicaX = Maquina("X")
+    politicaO = Maquina("O")
 
-    treinamento = jogoDaVelha(modeloX, modeloO)
+    treinamento = jogoDaVelha(politicaX, politicaO)
     print("Treinando...")
     treinamento.treinamento(10000)
     # Salva as políticas geradas
-    modeloX.salvaPolitica()
-    modeloO.salvaPolitica()
+    politicaX.salvaPolitica()
+    politicaO.salvaPolitica()
 
-    # Carrega um modelo salva e joga contra  um humano
-    modeloX = Maquina("Computador", taxa_exploracao=0.0)
-    modeloX.carregaPolitica("p_X")
+    # Carrega uma politica salva e joga contra um humano
+    politicaX = Maquina("Computador", taxa_exploracao=0.0)
+    politicaX.carregaPolitica("p_X")
     humano = Humano("Walter")
-    jogo = jogoDaVelha(modeloX, humano)
+    jogo = jogoDaVelha(politicaX, humano)
     jogo.partida()
