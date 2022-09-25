@@ -1,5 +1,37 @@
 # velha.py - Implementação de engine para jogar o jogo da velha utilizando Reinforcement Learning - Q-Learning.
 #
+# Reinforcement Learning é uma área de aprendizado de máquina em que agentes inteligentes toman ações em um ambiente
+# de forma a maximizar a noção de recompensa comulativa. É um dos tres paradigmas importantes de aprendizado de máquina,
+# em conjunto com aprendizado supervisionado e aprendizado não supervisionado.
+#
+# A ideia principal do Q-learning é preencher uma tabela de tamanho SxA, com S estados e A ações e pontuações Q a cada par - ou tupla - (s, a)
+# Para cada estado s, a melhor ação a tomar é aquela com a pontuação Q mais alta. Assim, com a tabela totalmente preenchida, e preenchida
+# corretamente, é possível escolher a melhor ação entre as alternativas de ações para cada estado.
+#
+# No jogo da velha o estado é o tabuleiro atual, e as ações são as possíveis jogadas no tabuleiro atual. Durante o treinamento a tabela Q é
+# inicializada com todos os valores em 0, já que não sabemos qual ação tomar em cada estado. Durante o treinamento, são atribuídos valores
+# às ações tomadas durante cada partida de treinamento. No fim da partida as recompensas são atribuídas à posição final, de acordo com o
+# resultado da partida, e então "propagadas" para os lances anteriores, que levaram àquela posição final. A recompensa é mais alta na
+# posição final e vai diminuindo para os lances anteriores.
+# A recompensa é calculada de acordo com a atualização dos valores Q:
+#
+# Qnovo(s, a) = (1 - alfa) * q(s, a) + alfa * (Rt+1 + gama * max(q(s', a')))
+#                                                              a'
+# A equação acima também pode ser escrita como:
+#
+# Qnovo(s, a) = q(s, a) + alfa * (Rt+1 + gama * max(q(s', a')) - q(s, a))
+#                                                a'
+#
+# Essa segunda forma facilita converter o seu cálculo em uma atualização do valor de Q, tal que q(s, a) += alfa * (...)
+#
+# O valor alfa, que é 0 <= alfa <= 1 é utilizado para ajustar o quanto o algoritmo aprende a cada nova partida de treinamento.
+# Com valores baixos de alfa (próximos de 0) temos um peso maior do valor do estado atual, com valores altos de alfa (próximos de 1),
+# temos um peso alto da recompensa, com pouca influência do valor Q do estado atual. Em geral alfa tem um valor mais próximo de
+# 0. Na nossa implementação, alfa (TAXA_APRENDIZADO) é 0.1
+# O fator gama indica quanto o valor da recompensa vai diminuindo à medida que esta é propagada pelos estados anteriores do
+# treinamento. No nosso exemplo, gama (GAMA)  tem valor 0.8
+#
+
 import numpy as np
 import pickle
 
@@ -31,11 +63,11 @@ NUM_CASAS = LINHAS * COLUNAS
 # Hiperparâmetros da política
 # TAXA_EXPLORACAO é a frequência com que o política tenta alternativas não previstas
 # TAXA_APRENDIZADO é o peso entre o valor do estado atual e o valor da recompensa
-# GAMMA é o desconto dado à recompensa
+# GAMA é o desconto dado à recompensa
 # LIMITE_EXPLORACAO deve ser usado apenas pela política em simulações e jogo, mas não em treino
 TAXA_EXPLORACAO = 0.3
 TAXA_APRENDIZADO = 0.1
-GAMMA = 0.8
+GAMA = 0.8
 LIMITE_EXPLORACAO = 0.0
 
 # Recompensas a propagar
@@ -85,6 +117,7 @@ EXTENSAO_POLITICA = "pjv"
 # serão 0.
 
 def geraHashTabuleiro(posicao):
+    """Gera o hash de uma posição, para representar o estado de uma jogada"""
     return str(posicao)
 
 class jogoDaVelha:
@@ -296,12 +329,12 @@ def valorEstado(estados, posicao):
 class Maquina():
     """Classe para representar uma política de jogo da velha
     Utilizado tanto no treinamento com reinforcement learning da política quanto em partidas contra outros adversários
-    Para o treinamento espera como entrada uma taxa de exploração, uma taxa de aprendizado e um fator de desconto gamma
+    Para o treinamento espera como entrada uma taxa de exploração, uma taxa de aprendizado e um fator de desconto GAMA
     """
     def __init__(self, nome,
                  taxa_exploracao=TAXA_EXPLORACAO,
                  taxa_aprendizado=TAXA_APRENDIZADO,
-                 gamma=GAMMA,
+                 gama=GAMA,
                  limite_exploracao=LIMITE_EXPLORACAO,
                  depuracao=False):
         """Intancia o objeto Maquina
@@ -310,7 +343,7 @@ class Maquina():
         Estados lista os estados do jogo atual
         Taxa_aprendizado: peso utilizado na propagação das recompensas
         Taxa_exploracao: percentual de exploracao de alternativas fora da política atual
-        Gamma: desconto da recompensa a ser propagada
+        Gama: desconto da recompensa a ser propagada
         Valores_estado: dicionário de valores dos estados da política, pares (posição, valor)
         """
         self.nome = nome
@@ -318,7 +351,7 @@ class Maquina():
         self.estados = []
         self.taxa_aprendizado = taxa_aprendizado
         self.taxa_exploracao = taxa_exploracao
-        self.gamma = gamma
+        self.gama = gama
         self.limite_exploracao = limite_exploracao
         self.depuracao = depuracao
         self.valores_estado = {}
@@ -335,6 +368,9 @@ class Maquina():
         Durante uma partida a taxa de exploração deve ser 0
         """
         def geraAlternativas(valores_estado, tabuleiro, casasLivres, jogador):
+            """Retorna uma lista de dicionários {'movimento': m, 'valor': v} ordenada por valor,
+            de forma decrescente (do maior para o menor valor)
+            """
             valoresHash = []
             for c in casasLivres:
                 tabuleiro[c] = jogador
@@ -367,11 +403,12 @@ class Maquina():
         """Propaga a recompensa pelos estados do jogo atual
         É o principal processo do reinforcement learning
         Perceba que os estados são percorridos de tras para frente, ou seja,
-        dos ultimos movimentos para os primeros, e que o valor da recompensa é reduzido pelo fator de desconto gamma"""
+        dos ultimos movimentos para os primeros, e que o valor da recompensa é reduzido pelo fator de desconto gama
+        """
         for estado in reversed(self.estados):
             if self.valores_estado.get(estado) is None:
                 self.valores_estado[estado] = 0
-            self.valores_estado[estado] += self.taxa_aprendizado * (self.gamma * premio - self.valores_estado[estado])
+            self.valores_estado[estado] += self.taxa_aprendizado * (self.gama * premio - self.valores_estado[estado])
             premio = self.valores_estado[estado]
 
     def salvaPolitica(self, prefixo=PREFIXO_POLITICA):
@@ -448,7 +485,7 @@ if __name__ == "__main__":
 
     # Carrega uma politica salva e joga contra um humano
     politicaX = Maquina("Computador", taxa_exploracao=0.0)
-    politicaX.carregaPolitica("p_X")
+    politicaX.carregaPolitica("X")
     humano = Humano("Walter")
     jogo = jogoDaVelha(politicaX, humano)
     jogo.partida()
