@@ -386,10 +386,10 @@ class Maquina():
         else:
             raise ValueError(f"Não consigo criar arquivos em {pasta}")
 
-    def carregaPolitica(self, politica):
+    def carregaPolitica(self, politica, prefixo=PREFIXO_POLITICA):
         """Carrega uma política para jogar ou continuar um treinamento"""
         pasta = Path(f'./{PASTA_POLITICAS}')
-        nome_arquivo = pasta / f'{politica}.{EXTENSAO_POLITICA}'
+        nome_arquivo = pasta / f'{prefixo}{politica}.{EXTENSAO_POLITICA}'
         if nome_arquivo.exists():
             with open(nome_arquivo, 'rb') as arquivo:
                 self.valores_estado = pickle.load(arquivo)
