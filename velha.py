@@ -1,35 +1,47 @@
 # velha.py - Implementação de engine para jogar o jogo da velha utilizando Reinforcement Learning - Q-Learning.
+# https://github.com/RobStelling/JogodaVelhaRL
 #
-# Reinforcement Learning é uma área de aprendizado de máquina em que agentes inteligentes toman ações em um ambiente
-# de forma a maximizar a noção de recompensa comulativa. É um dos tres paradigmas importantes de aprendizado de máquina,
-# em conjunto com aprendizado supervisionado e aprendizado não supervisionado.
+# Reinforcement Learning (RL) é uma área de aprendizado de máquina em que agentes inteligentes tomam ações em um ambiente
+# de forma a maximizar a noção de recompensa comulativa. Um mecanismo similar ocorre quando uma trilha é explorada
+# e aberta por animais na floresta, ou quando formigas exploram um ambiente e encontram alimento.
+# O Reinforcement Learning é um dos tres paradigmas mais importantes de aprendizado de máquina, em conjunto com
+# aprendizado supervisionado e aprendizado não supervisionado.
 #
-# A ideia principal do Q-learning é preencher uma tabela de tamanho SxA, com S estados e A ações e pontuações Q a cada par - ou tupla - (s, a)
-# Para cada estado s, a melhor ação a tomar é aquela com a pontuação Q mais alta. Assim, com a tabela totalmente preenchida, e preenchida
-# corretamente, é possível escolher a melhor ação entre as alternativas de ações para cada estado.
+# Nesse exemplo de RL vamos utilizar uma técnica conhecida como Q-learning.
+# A ideia principal do Q-learning é preencher uma tabela de tamanho SxA, com S estados e A ações com pontuações para cada par - ou tupla - (s, a)
+# Para cada estado "s", a melhor ação "a" a tomar é aquela com a pontuação mais alta. Assim, com a tabela totalmente preenchida, e preenchida
+# corretamente, é possível escolher a melhor ação entre as várias ações possíveis para cada estado.
 #
-# No jogo da velha o estado é o tabuleiro atual, e as ações são as possíveis jogadas no tabuleiro atual. Durante o treinamento a tabela Q é
-# inicializada com todos os valores em 0, já que não sabemos qual ação tomar em cada estado. Durante o treinamento, são atribuídos valores
-# às ações tomadas durante cada partida de treinamento. No fim da partida as recompensas são atribuídas à posição final, de acordo com o
-# resultado da partida, e então "propagadas" para os lances anteriores, que levaram àquela posição final. A recompensa é mais alta na
-# posição final e vai diminuindo para os lances anteriores.
-# A recompensa é calculada de acordo com a atualização dos valores Q:
+# No jogo da velha o estado é o tabuleiro atual, e as ações são as possíveis jogadas de um jogador no tabuleiro atual. Durante o
+# treinamento a tabela Q é inicializada com todos os valores em 0, já que no início não sabemos qual ação tomar em cada estado.
+# Para preencher a tabela Q é utilizada uma etapa de treinamento, onde os agentes (ou jogadores simulados) jogam várias vezes
+# entre si, distribuindo recompensas de acordo com o resultado do jogo. No nosso caso as recompensas são distribuídas apenas
+# no fim da partida, mas há implementações onde as recompensas são dadas a cada movimento. As recompensas do nosso jogo da velha
+# são VITORIA, DERROTA, VELHAX e VELHAO.
+# Enquanto o treinamento avança, são atribuídos valores às ações tomadas durante cada partida de treinamento. No fim de cada partida
+# as recompensas são atribuídas à posição final, de acordo com o resultado da partida, e então "propagadas" para os lances anteriores,
+# de forma que uma partida que tenha sido perdida propague recompensas negativas e uma partida vencida propague recompensas positivas.
+# As recompensas no caso de VELHA são 0, mas poderiam ser outros valores. Escolhemos também separar as recompensas de VELHA para o
+# jogador X, que sempre inicia nessa implementação, e jogador O, mas os valores dessas recompensas foram definidos como 0.
+#
+# A recompensa é calculada atualizando os valores Q(s, a), usando a equação de Bellman:
 #
 # Qnovo(s, a) = (1 - alfa) * q(s, a) + alfa * (Rt+1 + gama * max(q(s', a')))
 #                                                             a'
-# A equação acima também pode ser escrita como:
+# A equação acima também pode ser reescrita como:
 #
 # Qnovo(s, a) = q(s, a) + alfa * (Rt+1 + gama * max(q(s', a')) - q(s, a))
 #                                                a'
 #
-# Essa segunda forma facilita converter o seu cálculo em uma atualização do valor de Q, tal que q(s, a) += alfa * (...)
+# Essa segunda forma facilita converter o seu cálculo em uma atualização do valor de Q, tal que Q(s, a) += alfa * (...)
 #
-# O valor alfa, que é 0 <= alfa <= 1 é utilizado para ajustar o quanto o algoritmo aprende a cada nova partida de treinamento.
-# Com valores baixos de alfa (próximos de 0) temos um peso maior do valor do estado atual, com valores altos de alfa (próximos de 1),
-# temos um peso alto da recompensa, com pouca influência do valor Q do estado atual. Em geral alfa tem um valor mais próximo de
-# 0. Na nossa implementação, alfa (TAXA_APRENDIZADO) é 0.1
-# O fator gama indica quanto o valor da recompensa vai diminuindo à medida que esta é propagada pelos estados anteriores do
-# treinamento. No nosso exemplo, gama (GAMA)  tem valor 0.8
+# O valor alfa, chamado de taxa de aprendizado (learning rate em inglês), ajusta o peso de cada novo jogo na atualização
+# dos valores de q(s, a). Alfa é um valor entre 0 e 1.
+# Com valores baixos de alfa (próximos de 0) temos um peso maior do valor do estado e ações atuais, já com valores altos
+# de alfa (próximos de 1), temos um peso alto da recompensa, com pouca influência do valor Q(s, a) do estado e ação atuais.
+# Em geral alfa tem um valor mais próximo de 0. Na nossa implementação, alfa (TAXA_APRENDIZADO) é 0.2, mas pode ser modificado.
+# O fator gama, que também é entre 0 e 1, indica quanto o valor da melhor ação nos estados seguintes é propagado no estado e
+# ação atuais durante o treinamento. No nosso exemplo, gama (GAMA) tem valor 0.9, mas também pode ser modificado.
 #
 
 import numpy as np
@@ -43,13 +55,16 @@ from random import sample
 
 # Valores para casa vazia, jogador X e jogador O
 # X e O são potências de 2, ou seja, usam bits diferentes
-# e a operação X & O == 0
+# de forma que e a operação bitwise X & O seja igual a 0.
+# Por exemplo, se X = 1 e O = 2 então, em binário:
+# X = 001 e O = 010 então X & O == 0
 VAZIA = 0
 X = 1
-O = 4
+O = 2
 
 # Resultados, valores são referência à implementação
 # dos leds do Arduino : VELHA -> V, XGANHOU -> X, OGANHOU -> O
+# Ver: https://github.com/RobStelling/JogodaVelhaIRS
 DEUVELHA = int('0b010101101', 2)
 XGANHOU = int('0b101010101', 2)
 OGANHOU = int('0b111101111', 2)
@@ -61,38 +76,37 @@ COLUNAS = 3
 NUM_CASAS = LINHAS * COLUNAS
 
 # Hiperparâmetros da política
-# TAXA_EXPLORACAO é a frequência com que o política tenta alternativas não previstas
-# TAXA_APRENDIZADO é o peso entre o valor do estado atual e o valor da recompensa
-# GAMA é o desconto dado à recompensa
-# LIMITE_EXPLORACAO deve ser usado apenas pela política em simulações e jogo, mas não em treino
+# TAXA_EXPLORACAO: Frequência com que o política tenta alternativas não previstas
+# TAXA_APRENDIZADO: (ALFA) é o peso entre o valor do estado atual e o valor da recompensa
+# GAMA: Desconto dado à recompensa
+# LIMITE_EXPLORACAO: Limite máximo entre a melhor ação e ações alternativas para um determinado estado
 TAXA_EXPLORACAO = 0.3
 TAXA_APRENDIZADO = 0.2
 GAMA = 0.9
 LIMITE_EXPLORACAO = 0.0
 
-# Recompensas a propagar
-# Velha para quem inicia tem uma recompensa melhor que Velha para quem joga depois
-# O jogador com X sempre inicia o jogo
+# Valor inicial de um estado e ação - q(s, a) = 0.0
 INICIAL = 0.0
+# Recompensas a propagar
+# O jogador com X sempre inicia o jogo
 VITORIA = 2.0
 DERROTA = -1.0
 VELHAX = 0.1
 VELHAO = 0.1
 
-# Prefixo dos nomes dos arquivos de política ao serem salvos
-# p_: Política
-# .pjv: Política do Jogo da Velha
+# Atributos dos nomes dos arquivos de política ao serem salvos
+# Ex: {PASTA_POLITICAS}/{PREFIXO_POLITICA}{nome_política}.{EXTENSAO_POLITICA}
 PASTA_POLITICAS = "politicas"
 PREFIXO_POLITICA = "p_"
 EXTENSAO_POLITICA = "pjv"
 
-# Esta implementação do jogo da velha com Reinforcement Learning (Q-learning) é feita com 3 classes.
+# Esta implementação do jogo da velha com Reinforcement Learning (Q-learning) é feita utilizando 3 classes.
 #
 # jogodaVelha:
 # Nessa classe temos a representação do tabuleiro, métodos para treinamento de políticas (entre duas políticas),
 # métodos para partidas (entre pessoas e políticas ou mesmo entre políticas) e simulações (entre políticas)
 #
-#  Maquina:
+# Maquina:
 # Classe que representa uma política que será treinada
 # 
 # Humano:
@@ -103,8 +117,8 @@ EXTENSAO_POLITICA = "pjv"
 #
 # O 'coração' do Q-learning acontece nos métodos recompensa da classe jogoDaVelha e no método
 # propagaRecompensa da classe Máquina. Os dados sáo preservados no campo q da classe Máquina.
-# O espaço de estados é finito mas não é necessário preencher a matriz de estados com 0 em todas as
-# posições ao iniciar o treinamento. Um estado que não exista em q é assumido como 0.
+# O espaço de estados é finito mas não é necessário preencher a matriz q com 0 em todas as
+# posições ao iniciar o treinamento. Um estado que não exista em q é assumido como 0.0.
 # O método recompensa (jogoDaVelha) indica os valores que devem ser propagados por todos os movimentos a partir de uma partida de
 # treinamento que terminou
 # O método propagaRecompensa (Maquina) efetivamente propaga a premiação por todos os estados da partida que acabou de ser jogada
@@ -128,7 +142,6 @@ def resultado_jogo(tabuleiro):
     """Verifica o resultado do jogo
     Verifica todas as linhas, colunas e as duas diagonais em busca de 3 marcas consecutivas
     Retorna quem ganhou ou velha, se o jogo tiver acabado, senão retorna None
-    Atualiza a flag jogoDaVelha.terminou se o jogo tiver terminado
     """
     # Verifica todas as linhas
     for i in range(0, NUM_CASAS, LINHAS):
@@ -154,6 +167,7 @@ def resultado_jogo(tabuleiro):
     # Verifica se o jogo acabou com velha (não há mais posições livres)
     if num_casas_livres(tabuleiro) == 0:
         return DEUVELHA
+    # Senão o jogo ainda não acabou
     return None
 
 class jogoDaVelha:
@@ -164,13 +178,17 @@ class jogoDaVelha:
     Os movimentos do adversário são representados com O
     """
     # O Tabuleiro é um vetor de 9 posições (3x3),
-    # onde cada casa pode ser 0 (casa vazia), 1 (casa com X) ou 4 (casa com O)
-    # Observe que 1 e 4 são potências de 2, para permitir
-    # operações bit a bit e também somas como consultas (não utilizadas nessa versão até o momento).
+    # onde cada casa pode ser 0 (casa vazia), 1 (casa com X) ou 2 (casa com O)
+    # Observe que 1 e 2 são potências de 2 (2^0 e 2^1), para permitir
+    # operações bit a bit entre as casas do tabuleiro
     # Por exemplo:
-    # - A operação E bit a bit (&) entre 3 casas só tem resultado X ou O se todas as casas forem X ou todas forem O
-    # X sempre começa
+    # - A operação E bit a bit (&) entre 3 casas só tem resultado X se TODAS as casas forem X. E só tem
+    # resultado O se TODAS as casas forem O
+    # Lembre-se: X sempre começa!!
     def __init__(self, jogadorX, jogadorO):
+        """Inicialização da classe jogo da velha
+        Recebe como parâmetros os jogadores X e O, das classes Máquina ou Humano
+        """
         self.tabuleiro = np.zeros(NUM_CASAS, dtype=int)
         self.jogador = {X: jogadorX, O: jogadorO}
         self.terminou = False
@@ -182,10 +200,10 @@ class jogoDaVelha:
         Usado normalmente durante o treinamento da política
         """
         self.tabuleiro = np.zeros(NUM_CASAS, dtype=int)
-        self.terminou = False
-        self.vez = X
         self.jogador[X].reinicia()
         self.jogador[O].reinicia()
+        self.terminou = False
+        self.vez = X
 
     def resultado(self):
         """Verifica o resultado do jogo
@@ -198,7 +216,7 @@ class jogoDaVelha:
             self.terminou = True
         return estado
 
-    def treinamento(self, rodadas=1000, verifica=1000):
+    def treinamento(self, rodadas=1000, verifica=100):
         """Executa o loop de treinamento
         Recebe como parâmetros opcionais o número de rodadas e de quantas em quantas rodadas o treinamento
         deve ser verificado
@@ -232,8 +250,9 @@ class jogoDaVelha:
         Ou seja, coloca um X ou O na casa que foi escolhida para jogar e
         troca o jogador da vez
         """
+        troca = {X: O, O: X}
         self.tabuleiro[casa] = self.vez
-        self.vez = X if self.vez == O else O
+        self.vez = troca[self.vez]
 
     def recompensa(self, resultado):
         """Passa as recompensas para as políticas de acordo com o resultado do jogo
@@ -314,17 +333,6 @@ class jogoDaVelha:
             print(saida)
         print('-------------', flush=True)
 
-
-def valor_estado(estados, posicao):
-    """Retorna o valor de um estado, se ele não existir, retorna 0
-    Isso equivale a inicializar todos os estados com 0
-    """
-    valor = estados.get(posicao)
-    # Se não tem hash do próximo tabuleiro, então assume que o valor é 0
-    if valor is None:
-        return 0
-    return valor
-
 class Maquina():
     """Classe para representar uma política de jogo da velha
     Utilizado tanto no treinamento com reinforcement learning da política quanto em partidas contra outros adversários
@@ -387,7 +395,7 @@ class Maquina():
             jogada_max = max(self.q[hash_tabuleiro], key=self.q[hash_tabuleiro].get)
             valor_max = self.q[hash_tabuleiro][jogada_max]
             alternativas = [casa for casa in self.q[hash_tabuleiro] if (valor_max-self.q[hash_tabuleiro][casa]) <= self.limite_exploracao]
-            # Escolhe randomicamente uma das jogadas
+            # Escolhe randomicamente uma das jogadas, se houver mais de uma alternativa
             jogada = sample(alternativas, 1)[0]
             if self.depuracao:
                 print(hash_tabuleiro, jogada_max, valor_max, self.q[hash_tabuleiro])            
@@ -395,7 +403,9 @@ class Maquina():
         return jogada
     
     def acrescentaEstado(self, tabuleiro, jogada):
-        """Acrescenta um estado na lista, usado durante o treinamento"""
+        """Acrescenta um estado na lista, usado durante o treinamento
+        para representar os lances jogados durante a partida
+        """
         hash_tabuleiro = gera_hash_tabuleiro(tabuleiro)
         self.estados.append({'posicao': hash_tabuleiro, 'jogada': jogada})
 
@@ -414,7 +424,7 @@ class Maquina():
         estados = self.estados.copy()
         # Há duas formas (com o mesmo resultado) para o cálculo no novo Q(s, a)
         # estamos usando a forma:
-        # Novo Q(s, a) = Q(s, a) + alfa [R(s, a) + gama maxQ'(s', a') - Q(s, a)]
+        # Novo Q(s, a) = Q(s, a) + alfa * [R(s, a) + gama * maxQ'(s', a') - Q(s, a)]
         for i in range(len(estados)-1):
             s = estados[i]['posicao']
             a = estados[i]['jogada']
