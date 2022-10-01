@@ -16,7 +16,7 @@
 # A recompensa é calculada de acordo com a atualização dos valores Q:
 #
 # Qnovo(s, a) = (1 - alfa) * q(s, a) + alfa * (Rt+1 + gama * max(q(s', a')))
-#                                                              a'
+#                                                             a'
 # A equação acima também pode ser escrita como:
 #
 # Qnovo(s, a) = q(s, a) + alfa * (Rt+1 + gama * max(q(s', a')) - q(s, a))
@@ -66,17 +66,18 @@ NUM_CASAS = LINHAS * COLUNAS
 # GAMA é o desconto dado à recompensa
 # LIMITE_EXPLORACAO deve ser usado apenas pela política em simulações e jogo, mas não em treino
 TAXA_EXPLORACAO = 0.3
-TAXA_APRENDIZADO = 0.1
-GAMA = 0.8
+TAXA_APRENDIZADO = 0.2
+GAMA = 0.9
 LIMITE_EXPLORACAO = 0.0
 
 # Recompensas a propagar
 # Velha para quem inicia tem uma recompensa melhor que Velha para quem joga depois
 # O jogador com X sempre inicia o jogo
-VITORIA = 1.0
-DERROTA = 0.0
+INICIAL = 0.0
+VITORIA = 2.0
+DERROTA = -1.0
 VELHAX = 0.1
-VELHAO = 0.5
+VELHAO = 0.1
 
 # Prefixo dos nomes dos arquivos de política ao serem salvos
 # p_: Política
@@ -101,9 +102,9 @@ EXTENSAO_POLITICA = "pjv"
 # com duas classes separadas
 #
 # O 'coração' do Q-learning acontece nos métodos recompensa da classe jogoDaVelha e no método
-# propagaRecompensa da classe Máquina. Os dados sáo preservados no campo valores_estado da classe Máquina.
+# propagaRecompensa da classe Máquina. Os dados sáo preservados no campo q da classe Máquina.
 # O espaço de estados é finito mas não é necessário preencher a matriz de estados com 0 em todas as
-# posições ao iniciar o treinamento. Um estado que não exista em valores_estado é assumido como 0.
+# posições ao iniciar o treinamento. Um estado que não exista em q é assumido como 0.
 # O método recompensa (jogoDaVelha) indica os valores que devem ser propagados por todos os movimentos a partir de uma partida de
 # treinamento que terminou
 # O método propagaRecompensa (Maquina) efetivamente propaga a premiação por todos os estados da partida que acabou de ser jogada
@@ -116,9 +117,44 @@ EXTENSAO_POLITICA = "pjv"
 # porque como os estados do ponto de vista do jogador O não existem na política para X, todos os valores de Q para essses estados
 # serão 0.
 
-def geraHashTabuleiro(posicao):
+def gera_hash_tabuleiro(posicao):
     """Gera o hash de uma posição, para representar o estado de uma jogada"""
     return str(posicao)
+
+def num_casas_livres(tabuleiro):
+    return sum(tabuleiro == VAZIA)
+
+def resultado_jogo(tabuleiro):
+    """Verifica o resultado do jogo
+    Verifica todas as linhas, colunas e as duas diagonais em busca de 3 marcas consecutivas
+    Retorna quem ganhou ou velha, se o jogo tiver acabado, senão retorna None
+    Atualiza a flag jogoDaVelha.terminou se o jogo tiver terminado
+    """
+    # Verifica todas as linhas
+    for i in range(0, NUM_CASAS, LINHAS):
+        completou = np.bitwise_and.reduce(tabuleiro[i:i+LINHAS])
+        if completou == X:
+            return XGANHOU
+        elif completou == O:
+            return OGANHOU
+    # Verifica todas as colunas
+    for i in range(0, COLUNAS):
+        completou = tabuleiro[i] & tabuleiro[i+COLUNAS] & tabuleiro[i+2*COLUNAS]
+        if completou == X:
+            return XGANHOU
+        elif completou == O:
+            return OGANHOU
+    # Verifica as duas diagonais
+    completou = (tabuleiro[0] & tabuleiro[4] & tabuleiro[8]) | \
+                (tabuleiro[2] & tabuleiro[4] & tabuleiro[6])
+    if completou == X:
+        return XGANHOU
+    elif completou == O:
+        return OGANHOU
+    # Verifica se o jogo acabou com velha (não há mais posições livres)
+    if num_casas_livres(tabuleiro) == 0:
+        return DEUVELHA
+    return None
 
 class jogoDaVelha:
     """Classe para treinamento de políticas com reinforcement learning do jogo da velha
@@ -148,6 +184,8 @@ class jogoDaVelha:
         self.tabuleiro = np.zeros(NUM_CASAS, dtype=int)
         self.terminou = False
         self.vez = X
+        self.jogador[X].reinicia()
+        self.jogador[O].reinicia()
 
     def resultado(self):
         """Verifica o resultado do jogo
@@ -155,44 +193,10 @@ class jogoDaVelha:
         Retorna quem ganhou ou velha, se o jogo tiver acabado, senão retorna None
         Atualiza a flag jogoDaVelha.terminou se o jogo tiver terminado
         """
-        # Verifica todas as linhas
-        for i in range(0, NUM_CASAS, LINHAS):
-            completou = np.bitwise_and.reduce(self.tabuleiro[i:i+LINHAS])
-            if completou == X:
-                self.terminou = True
-                return XGANHOU
-            elif completou == O:
-                self.terminou = True
-                return OGANHOU
-        # Verifica todas as colunas
-        for i in range(0, COLUNAS):
-            completou = self.tabuleiro[i] & self.tabuleiro[i+COLUNAS] & self.tabuleiro[i+2*COLUNAS]
-            if completou == X:
-                self.terminou = True
-                return XGANHOU
-            elif completou == O:
-                self.terminou = True
-                return OGANHOU
-        # Verifica as duas diagonais
-        completou = (self.tabuleiro[0] & self.tabuleiro[4] & self.tabuleiro[8]) | \
-                    (self.tabuleiro[2] & self.tabuleiro[4] & self.tabuleiro[6])
-        if completou == X:
+        estado = resultado_jogo(self.tabuleiro)
+        if estado is not None:
             self.terminou = True
-            return XGANHOU
-        elif completou == O:
-            self.terminou = True
-            return OGANHOU
-        # Verifica se o jogo acabou com velha (não há mais posições livres)
-        if self.numcasasLivres() == 0:
-            self.terminou = True
-            return DEUVELHA
-        
-        # Senão, o jogo ainda não terminou
-        return None
-
-    def numcasasLivres(self):
-        """Retorna o número de casas livres do jogo atual"""
-        return sum(self.tabuleiro == VAZIA)
+        return estado
 
     def treinamento(self, rodadas=1000, verifica=1000):
         """Executa o loop de treinamento
@@ -208,17 +212,13 @@ class jogoDaVelha:
                 vez = self.vez
                 jogada = self.jogador[vez].escolheJogada(alternativas, self.tabuleiro, vez)
                 self.jogada(jogada)
-                hash_tabuleiro = geraHashTabuleiro(self.tabuleiro)
-                self.jogador[vez].acrescentaEstado(hash_tabuleiro)
-
                 # Se o jogo terminou (X venceu, O venceu ou velha)
                 # propaga as recompensas pelos estados,
                 # reinicia jogo e jogadores e volta ao loop de treinamento
-                if self.resultado() is not None:
-                    self.recompensa()
+                resultado = self.resultado()
+                if resultado is not None:
+                    self.recompensa(resultado)
                     self.reinicia()
-                    self.jogador[X].reinicia()
-                    self.jogador[O].reinicia()
                     break
 
         print(f"Treinamento finalizado: {rodadas} rodadas")
@@ -235,11 +235,10 @@ class jogoDaVelha:
         self.tabuleiro[casa] = self.vez
         self.vez = X if self.vez == O else O
 
-    def recompensa(self):
+    def recompensa(self, resultado):
         """Passa as recompensas para as políticas de acordo com o resultado do jogo
         As recompensas são propagadas nas políticas de cada jogador a partir dos seus lances nessa instância do jogo
         """
-        resultado = self.resultado()
         if resultado == XGANHOU:
             self.jogador[X].propagaRecompensa(VITORIA)
             self.jogador[O].propagaRecompensa(DERROTA)
@@ -298,7 +297,7 @@ class jogoDaVelha:
                 if resultado is not None:
                     # Então o jogo acabou
                     totalizacao['Velha' if resultado == DEUVELHA else self.jogador[vez].nome]+=1
-                    tabuleiros[geraHashTabuleiro(self.tabuleiro)]+=1
+                    tabuleiros[gera_hash_tabuleiro(self.tabuleiro)]+=1
         
             self.reinicia()
         return totalizacao, tabuleiros
@@ -316,7 +315,7 @@ class jogoDaVelha:
         print('-------------', flush=True)
 
 
-def valorEstado(estados, posicao):
+def valor_estado(estados, posicao):
     """Retorna o valor de um estado, se ele não existir, retorna 0
     Isso equivale a inicializar todos os estados com 0
     """
@@ -340,21 +339,21 @@ class Maquina():
         """Intancia o objeto Maquina
         Nome: usado para salvar/recuperar as políticas e também para representar o jogador
         Tipo: indica se é uma  política ou um humano
-        Estados lista os estados do jogo atual
+        Estados: lista os estados do jogo atual
+        q: Valores q
         Taxa_aprendizado: peso utilizado na propagação das recompensas
         Taxa_exploracao: percentual de exploracao de alternativas fora da política atual
         Gama: desconto da recompensa a ser propagada
-        Valores_estado: dicionário de valores dos estados da política, pares (posição, valor)
         """
         self.nome = nome
         self.tipo = "Computador"
         self.estados = []
+        self.q = {}
         self.taxa_aprendizado = taxa_aprendizado
         self.taxa_exploracao = taxa_exploracao
         self.gama = gama
         self.limite_exploracao = limite_exploracao
         self.depuracao = depuracao
-        self.valores_estado = {}
 
     def reinicia(self):
         """Reinicia a política para a próxima partida
@@ -367,49 +366,63 @@ class Maquina():
         acordo com a taxa de exploração
         Durante uma partida a taxa de exploração deve ser 0
         """
-        def geraAlternativas(valores_estado, tabuleiro, casasLivres, jogador):
-            """Retorna uma lista de dicionários {'movimento': m, 'valor': v} ordenada por valor,
-            de forma decrescente (do maior para o menor valor)
-            """
-            valoresHash = []
-            for c in casasLivres:
-                tabuleiro[c] = jogador
-                hash_tabuleiro = geraHashTabuleiro(tabuleiro)
-                valoresHash.append({'movimento': c, 'valor': valorEstado(valores_estado, hash_tabuleiro)})
-                tabuleiro[c] = VAZIA
-            return sorted(valoresHash, key=lambda x: x['valor'], reverse=True)
-
-        if np.random.uniform(0, 1) <= self.taxa_exploracao:
+        copia_tabuleiro = tabuleiro.copy()
+        hash_tabuleiro = gera_hash_tabuleiro(copia_tabuleiro)
+        # Se o jogador ainda não "viu" a posição atual então insere em q
+        # e inicializa q[hash_tabuleiro][jogada] = 0.0, para todas a jogadas
+        # possíveis no tabuleiro atual
+        if not hash_tabuleiro in self.q:
+            self.q[hash_tabuleiro] = {casa: INICIAL for casa in casasLivres}
+        
+        if np.random.uniform(0, 1) < self.taxa_exploracao:
             # Executa ação randômica de acordo com a taxa de exploração
             # se a taxa de exploração for 0.0 então todas as ações virão da
             # política
             jogada = np.random.choice(casasLivres)
         else:
-            valores_hash = geraAlternativas(self.valores_estado, tabuleiro, casasLivres, jogador)
-            max = valores_hash[0]['valor']
+            # Escolhe uma das alternativas que maximizam q
+            # jogada_max é uma das jogadas com q maior (pode haver mais de uma com o mesmo valor máximo)
+            # valor_max é o valor dessa jogada
+            # alternativas são todas as jogadas com esse valor máximo
+            jogada_max = max(self.q[hash_tabuleiro], key=self.q[hash_tabuleiro].get)
+            valor_max = self.q[hash_tabuleiro][jogada_max]
+            alternativas = [casa for casa in self.q[hash_tabuleiro] if (valor_max-self.q[hash_tabuleiro][casa]) <= self.limite_exploracao]
+            # Escolhe randomicamente uma das jogadas
+            jogada = sample(alternativas, 1)[0]
             if self.depuracao:
-                print(max, self.limite_exploracao, valores_hash)
-            # Seleciona alternativas de lances, se valor >= max-limite_exploração
-            alternativas = [opcao['movimento'] for opcao in valores_hash if (max-opcao['valor']) <= self.limite_exploracao]
-            # Escolhe uma opção aleatoriamente
-            jogada = sample(alternativas, 1)
+                print(hash_tabuleiro, jogada_max, valor_max, self.q[hash_tabuleiro])            
+        self.acrescentaEstado(copia_tabuleiro, jogada)
         return jogada
     
-    def acrescentaEstado(self, estado):
-        """Acresdenta um estado na lista, usado durante o treinamento"""
-        self.estados.append(estado)
+    def acrescentaEstado(self, tabuleiro, jogada):
+        """Acrescenta um estado na lista, usado durante o treinamento"""
+        hash_tabuleiro = gera_hash_tabuleiro(tabuleiro)
+        self.estados.append({'posicao': hash_tabuleiro, 'jogada': jogada})
 
-    def propagaRecompensa(self, premio):
+    def maxq(self, estado):
+        """Retorna o valor mais alto de q entre as alternativas de ações em um dado estado"""
+        max_index = max(self.q[estado], key=self.q[estado].get)
+        return self.q[estado][max_index]
+
+    def propagaRecompensa(self, recompensa):
         """Propaga a recompensa pelos estados do jogo atual
         É o principal processo do reinforcement learning
-        Perceba que os estados são percorridos de tras para frente, ou seja,
-        dos ultimos movimentos para os primeros, e que o valor da recompensa é reduzido pelo fator de desconto gama
+        Perceba que os estados são percorridos de trás para frente, ou seja,
+        dos ultimos movimentos para os primeiros, e que o valor da recompensa
+        é reduzido pelo fator de desconto gama
         """
-        for estado in reversed(self.estados):
-            if self.valores_estado.get(estado) is None:
-                self.valores_estado[estado] = 0
-            self.valores_estado[estado] += self.taxa_aprendizado * (self.gama * premio - self.valores_estado[estado])
-            premio = self.valores_estado[estado]
+        estados = self.estados.copy()
+        # Há duas formas (com o mesmo resultado) para o cálculo no novo Q(s, a)
+        # estamos usando a forma:
+        # Novo Q(s, a) = Q(s, a) + alfa [R(s, a) + gama maxQ'(s', a') - Q(s, a)]
+        for i in range(len(estados)-1):
+            s = estados[i]['posicao']
+            a = estados[i]['jogada']
+            s_linha = estados[i+1]['posicao']
+            self.q[s][a] += self.taxa_aprendizado * (recompensa + self.gama * self.maxq(s_linha) - self.q[s][a])
+        s = estados[i+1]['posicao']
+        a = estados[i+1]['jogada']
+        self.q[s][a] += self.taxa_aprendizado * (recompensa + self.gama * recompensa - self.q[s][a])
 
     def salvaPolitica(self, prefixo=PREFIXO_POLITICA):
         """Salva uma política para uso futuro"""
@@ -419,7 +432,7 @@ class Maquina():
         if pasta.is_dir():
             nome_arquivo = pasta / f'{prefixo}{str(self.nome)}.{EXTENSAO_POLITICA}' 
             with open(nome_arquivo, 'wb' ) as arquivo:
-                pickle.dump(self.valores_estado, arquivo)
+                pickle.dump(self.q, arquivo)
         else:
             raise ValueError(f"Não consigo criar arquivos em {pasta}")
 
@@ -429,25 +442,25 @@ class Maquina():
         nome_arquivo = pasta / f'{prefixo}{politica}.{EXTENSAO_POLITICA}'
         if nome_arquivo.exists():
             with open(nome_arquivo, 'rb') as arquivo:
-                self.valores_estado = pickle.load(arquivo)
+                self.q = pickle.load(arquivo)
         else:
             raise ValueError(f"Política {politica} não existe!")
 
     def combinaESalvaPolitica(self, politica2, nome, prefixo=PREFIXO_POLITICA):
-        """Combina duas políticas em uma e salva valores_estado
+        """Combina duas políticas em uma e salva tabela q
         O objetivo é combinar duas políticas, uma para X e uma para O em uma só política, já que as
         tuplas (hashTabuleiro, valor) são mutualmente excludentes nas políticas para X e O
         """
         politica = deepcopy(self)
         politica.nome = nome
-        politica.valores_estado = {**self.valores_estado, **politica2.valores_estado}
+        politica.q = {**self.q, **politica2.q}
         pasta = Path(f'./{PASTA_POLITICAS}')
         if not pasta.exists():
             pasta.mkdir()
         if pasta.is_dir():
             nome_arquivo = pasta / f'{prefixo}{nome}.{EXTENSAO_POLITICA}'
             with open(nome_arquivo, 'wb') as arquivo:
-                pickle.dump(politica.valores_estado, arquivo)
+                pickle.dump(politica.q, arquivo)
         else:
             raise ValueError(f"Não consigo criar arquivos em {pasta}")
 
@@ -468,6 +481,9 @@ class Humano:
             print(f"Você jogou {acao}")
             if acao in casasLivres:
                 return acao
+
+    def reinicia(self):
+        pass
     
 
 if __name__ == "__main__":
