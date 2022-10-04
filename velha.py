@@ -116,19 +116,20 @@ EXTENSAO_POLITICA = "pjv"
 # com duas classes separadas
 #
 # O 'coração' do Q-learning acontece nos métodos recompensa da classe jogoDaVelha e no método
-# propagaRecompensa da classe Máquina. Os dados sáo preservados no campo q da classe Máquina.
+# propagaRecompensa da classe Máquina. A tabela Q é preservados no campo q da classe Máquina.
 # O espaço de estados é finito mas não é necessário preencher a matriz q com 0 em todas as
-# posições ao iniciar o treinamento. Um estado que não exista em q é assumido como 0.0.
-# O método recompensa (jogoDaVelha) indica os valores que devem ser propagados por todos os movimentos a partir de uma partida de
-# treinamento que terminou
-# O método propagaRecompensa (Maquina) efetivamente propaga a premiação por todos os estados da partida que acabou de ser jogada
+# posições ao iniciar o treinamento. Um estado que não exista em q é assumido como 0.0 no momento
+# da sua criação.
+# O método recompensa (classe jogoDaVelha) indica os valores que devem ser propagados por todos os movimentos a partir de uma partida de
+# treinamento que terminou.
+# O método propagaRecompensa (classe Maquina) efetivamente propaga a premiação por todos os estados da partida que acabou de ser jogada
 #
 # Ao fim de cada partida de treinamento os valores de recompensa são propagados por todas as posições que ocorreram no jogo, dando
 # prêmios correspondentes ao jogadores de X e O. As políticas para X e O são treinadas e preservadas em separado mas é possível,
 # ao fim do treinamento, juntar as políticas e salvá-las como se fosse uma só (método combinaESalvaPolitica), gerando assim uma
 # política que joga como X e como O.
 # Como curiosidade, se usarmos uma política treinada apenas como X para jogar como O teremos um comportamento randômico da política,
-# porque como os estados do ponto de vista do jogador O não existem na política para X, todos os valores de Q para essses estados
+# porque como os estados do ponto de vista do jogador O não existem na política para X, todos os valores de Q para esses estados
 # serão 0.
 
 def gera_hash_tabuleiro(posicao):
@@ -486,9 +487,9 @@ class Humano:
         se esta envolver pelo menos um jogador humano
         """
         while True:
-            print("Qual a casa? ", end='')
+            print(f"Qual a sua jogada, {self.nome}? ", end='')
             acao = int(input())
-            print(f"Você jogou {acao}")
+            print(f"{self.nome} jogou {acao}")
             if acao in casasLivres:
                 return acao
 
