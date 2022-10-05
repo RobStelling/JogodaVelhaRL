@@ -92,7 +92,7 @@ INICIAL = 0.0
 VITORIA = 2.0
 DERROTA = -1.0
 VELHAX = 0.1
-VELHAO = 0.1
+VELHAO = 1.0
 
 # Atributos dos nomes dos arquivos de política ao serem salvos
 # Ex: {PASTA_POLITICAS}/{PREFIXO_POLITICA}{nome_política}.{EXTENSAO_POLITICA}
