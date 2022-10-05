@@ -132,14 +132,14 @@ EXTENSAO_POLITICA = "pjv"
 # porque como os estados do ponto de vista do jogador O não existem na política para X, todos os valores de Q para esses estados
 # serão 0.
 
-def gera_hash_tabuleiro(posicao):
+def _gera_hash_tabuleiro(posicao):
     """Gera o hash de uma posição, para representar o estado de uma jogada"""
     return str(posicao)
 
-def num_casas_livres(tabuleiro):
+def _num_casas_livres(tabuleiro):
     return sum(tabuleiro == VAZIA)
 
-def resultado_jogo(tabuleiro):
+def _resultado_jogo(tabuleiro):
     """Verifica o resultado do jogo
     Verifica todas as linhas, colunas e as duas diagonais em busca de 3 marcas consecutivas
     Retorna quem ganhou ou velha, se o jogo tiver acabado, senão retorna None
@@ -166,7 +166,7 @@ def resultado_jogo(tabuleiro):
     elif completou == O:
         return OGANHOU
     # Verifica se o jogo acabou com velha (não há mais posições livres)
-    if num_casas_livres(tabuleiro) == 0:
+    if _num_casas_livres(tabuleiro) == 0:
         return DEUVELHA
     # Senão o jogo ainda não acabou
     return None
@@ -216,7 +216,7 @@ class jogoDaVelha:
         Retorna quem ganhou ou velha, se o jogo tiver acabado, senão retorna None
         Atualiza a flag jogoDaVelha.terminou se o jogo tiver terminado
         """
-        estado = resultado_jogo(self.tabuleiro)
+        estado = _resultado_jogo(self.tabuleiro)
         if estado is not None:
             self.terminou = True
         return estado
@@ -321,7 +321,7 @@ class jogoDaVelha:
                 if resultado is not None:
                     # Então o jogo acabou
                     totalizacao['Velha' if resultado == DEUVELHA else self.jogador[vez].nome]+=1
-                    tabuleiros[gera_hash_tabuleiro(self.tabuleiro)]+=1
+                    tabuleiros[_gera_hash_tabuleiro(self.tabuleiro)]+=1
         
             self.reinicia()
         return totalizacao, tabuleiros
@@ -380,7 +380,7 @@ class Maquina():
         Durante uma partida a taxa de exploração deve ser 0
         """
         copia_tabuleiro = tabuleiro.copy()
-        hash_tabuleiro = gera_hash_tabuleiro(copia_tabuleiro)
+        hash_tabuleiro = _gera_hash_tabuleiro(copia_tabuleiro)
         # Se o jogador ainda não "viu" a posição atual então insere em q
         # e inicializa q[hash_tabuleiro][jogada] = 0.0, para todas a jogadas
         # possíveis no tabuleiro atual
@@ -411,7 +411,7 @@ class Maquina():
         """Acrescenta um estado na lista, usado durante o treinamento
         para representar os lances jogados durante a partida
         """
-        hash_tabuleiro = gera_hash_tabuleiro(tabuleiro)
+        hash_tabuleiro = _gera_hash_tabuleiro(tabuleiro)
         self.estados.append({'posicao': hash_tabuleiro, 'jogada': jogada})
 
     def maxq(self, estado):
