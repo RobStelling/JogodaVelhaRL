@@ -171,6 +171,10 @@ def resultado_jogo(tabuleiro):
     # Senão o jogo ainda não acabou
     return None
 
+def existePolitica(politica):
+    return (Path(PASTA_POLITICAS) / f"{PREFIXO_POLITICA}{politica}.{EXTENSAO_POLITICA}").exists()
+
+
 class jogoDaVelha:
     """Classe para treinamento de políticas com reinforcement learning do jogo da velha
     A classe também pode ser usada para jogos entre humanos, entre humano e políticas e entre políticas
