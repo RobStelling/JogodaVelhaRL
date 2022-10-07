@@ -116,23 +116,23 @@ EXTENSAO_POLITICA = "pjv"
 # com duas classes separadas
 #
 # O 'coração' do Q-learning acontece nos métodos recompensa da classe jogoDaVelha e no método
-# propagaRecompensa da classe Máquina. A tabela Q é preservados no campo q da classe Máquina.
+# propaga_recompensa da classe Máquina. A tabela Q é preservados no campo q da classe Máquina.
 # O espaço de estados é finito mas não é necessário preencher a matriz q com 0 em todas as
 # posições ao iniciar o treinamento. Um estado que não exista em q é assumido como 0.0 no momento
 # da sua criação.
 # O método recompensa (classe jogoDaVelha) indica os valores que devem ser propagados por todos os movimentos a partir de uma partida de
 # treinamento que terminou.
-# O método propagaRecompensa (classe Maquina) efetivamente propaga a premiação por todos os estados da partida que acabou de ser jogada
+# O método propaga_recompensa (classe Maquina) efetivamente propaga a premiação por todos os estados da partida que acabou de ser jogada
 #
 # Ao fim de cada partida de treinamento os valores de recompensa são propagados por todas as posições que ocorreram no jogo, dando
 # prêmios correspondentes ao jogadores de X e O. As políticas para X e O são treinadas e preservadas em separado mas é possível,
-# ao fim do treinamento, juntar as políticas e salvá-las como se fosse uma só (método combinaESalvaPolitica), gerando assim uma
+# ao fim do treinamento, juntar as políticas e salvá-las como se fosse uma só (método combina_e_salva_politica), gerando assim uma
 # política que joga como X e como O.
 # Como curiosidade, se usarmos uma política treinada apenas como X para jogar como O teremos um comportamento randômico da política,
 # porque como os estados do ponto de vista do jogador O não existem na política para X, todos os valores de Q para esses estados
 # serão 0.
 
-def geraHashTabuleiro(posicao):
+def gera_hash_tabuleiro(posicao):
     """Gera o hash de uma posição, para representar o estado de uma jogada"""
     return str(posicao)
 
@@ -171,19 +171,19 @@ def _resultado_jogo(tabuleiro):
     # Senão o jogo ainda não acabou
     return None
 
-def existePolitica(politica):
+def existe_politica(politica):
     return (Path(PASTA_POLITICAS) / f"{PREFIXO_POLITICA}{politica}.{EXTENSAO_POLITICA}").exists()
 
-def mostraTabuleiro(tabuleiro):
+def mostra_tabuleiro(tabuleiro):
     """Mostra a posição atual do tabuleiro de forma simples"""
     simbolo = {X: 'X', O: 'O', 0: ' '}
     for i in range(0, LINHAS):
         print('-------------')
-        saida = "| "
+        linha = "| "
         for j in range(0, COLUNAS):
             valor = tabuleiro[i*COLUNAS + j]
-            saida += simbolo[valor] + " | "
-        print(saida)
+            linha += simbolo[valor] + " | "
+        print(linha)
     print('-------------', flush=True)
 
 
@@ -202,12 +202,12 @@ class jogoDaVelha:
     # - A operação E bit a bit (&) entre 3 casas só tem resultado X se TODAS as casas forem X. E só tem
     # resultado O se TODAS as casas forem O
     # Lembre-se: X sempre começa!!
-    def __init__(self, jogadorX, jogadorO):
+    def __init__(self, jogador_X, jogador_O):
         """Inicialização da classe jogo da velha
         Recebe como parâmetros os jogadores X e O, das classes Máquina ou Humano
         """
         self.tabuleiro = np.zeros(NUM_CASAS, dtype=int)
-        self.jogador = {X: jogadorX, O: jogadorO}
+        self.jogador = {X: jogador_X, O: jogador_O}
         self.terminou = False
         # X sempre começa
         self.vez = X
@@ -243,9 +243,9 @@ class jogoDaVelha:
             if rodada % verifica == 0:
                 print(f"Rodadas: {rodada}")
             while True:
-                alternativas = self.casasLivres()
+                alternativas = self.casas_livres()
                 vez = self.vez
-                jogada = self.jogador[vez].escolheJogada(alternativas, self.tabuleiro, vez)
+                jogada = self.jogador[vez].escolhe_jogada(alternativas, self.tabuleiro, vez)
                 self.jogada(jogada)
                 # Se o jogo terminou (X venceu, O venceu ou velha)
                 # propaga as recompensas pelos estados,
@@ -258,7 +258,7 @@ class jogoDaVelha:
 
         print(f"Treinamento finalizado: {rodadas} rodadas")
 
-    def casasLivres(self):
+    def casas_livres(self):
         """Retorna uma lista de casas livres"""
         return [casa for casa, vazia in enumerate(self.tabuleiro == VAZIA) if vazia]
 
@@ -276,14 +276,14 @@ class jogoDaVelha:
         As recompensas são propagadas nas políticas de cada jogador a partir dos seus lances nessa instância do jogo
         """
         if resultado == XGANHOU:
-            self.jogador[X].propagaRecompensa(VITORIA)
-            self.jogador[O].propagaRecompensa(DERROTA)
+            self.jogador[X].propaga_recompensa(VITORIA)
+            self.jogador[O].propaga_recompensa(DERROTA)
         elif resultado == OGANHOU:
-            self.jogador[X].propagaRecompensa(DERROTA)
-            self.jogador[O].propagaRecompensa(VITORIA)
+            self.jogador[X].propaga_recompensa(DERROTA)
+            self.jogador[O].propaga_recompensa(VITORIA)
         else: # Deu velha
-            self.jogador[X].propagaRecompensa(VELHAX)
-            self.jogador[O].propagaRecompensa(VELHAO)
+            self.jogador[X].propaga_recompensa(VELHAX)
+            self.jogador[O].propaga_recompensa(VELHAO)
 
     def partida(self, saida=True):
         """Jogo entre dois jogadores
@@ -293,17 +293,18 @@ class jogoDaVelha:
         Reinicia as condições do jogo ao fim da partida
         """
         while not self.terminou:
-            alternativas = self.casasLivres()
+            alternativas = self.casas_livres()
             vez = self.vez
             if self.jogador[vez].tipo == "Computador":
-                jogada = self.jogador[vez].escolheJogada(alternativas, self.tabuleiro, vez)
+                jogada = self.jogador[vez].escolhe_jogada(alternativas, self.tabuleiro)
             else:
-                jogada = self.jogador[vez].escolheJogada(alternativas)
+                jogada = self.jogador[vez].escolhe_jogada(alternativas)
             # O método self.jogada altera o jogador da vez (self.vez),
             # por isso o valor self.vez é guardado na variável vez
             self.jogada(jogada)
             if (saida):
-                self.mostraTabuleiro()
+                print(f'{self.jogador[vez].nome} jogou {jogada}')
+                self.mostra_tabuleiro()
 
             resultado = self.resultado()
             if resultado is not None:
@@ -325,22 +326,22 @@ class jogoDaVelha:
         tabuleiros = Counter()
         for _ in range(partidas):
             while not self.terminou:
-                alternativas = self.casasLivres()
+                alternativas = self.casas_livres()
                 vez = self.vez
-                jogada = self.jogador[vez].escolheJogada(alternativas, self.tabuleiro, vez)
+                jogada = self.jogador[vez].escolhe_jogada(alternativas, self.tabuleiro)
                 self.jogada(jogada)
                 resultado = self.resultado()
                 if resultado is not None:
                     # Então o jogo acabou
                     totalizacao['Velha' if resultado == DEUVELHA else self.jogador[vez].nome]+=1
-                    tabuleiros[geraHashTabuleiro(self.tabuleiro)]+=1
+                    tabuleiros[gera_hash_tabuleiro(self.tabuleiro)]+=1
         
             self.reinicia()
         return totalizacao, tabuleiros
     
-    def mostraTabuleiro(self):
+    def mostra_tabuleiro(self):
         """Mostra a posição atual do tabuleiro de forma simples"""
-        mostraTabuleiro(self.tabuleiro)
+        mostra_tabuleiro(self.tabuleiro)
 
 class Maquina():
     """Classe para representar uma política de jogo da velha
@@ -377,25 +378,25 @@ class Maquina():
         Apenas descarta os estados do jogo atual"""
         self.estados = []
 
-    def escolheJogada(self, casasLivres, tabuleiro, jogador):
+    def escolhe_jogada(self, casas_livres, tabuleiro):
         """Retorna a jogada a fazer, em função da política até o momento
         Pode retornar uma jogada randômica, entre as jogadas disponíveis, de
         acordo com a taxa de exploração
         Durante uma partida a taxa de exploração deve ser 0
         """
         copia_tabuleiro = tabuleiro.copy()
-        hash_tabuleiro = geraHashTabuleiro(copia_tabuleiro)
+        hash_tabuleiro = gera_hash_tabuleiro(copia_tabuleiro)
         # Se o jogador ainda não "viu" a posição atual então insere em q
         # e inicializa q[hash_tabuleiro][jogada] = 0.0, para todas a jogadas
         # possíveis no tabuleiro atual
         if not hash_tabuleiro in self.q:
-            self.q[hash_tabuleiro] = {casa: INICIAL for casa in casasLivres}
+            self.q[hash_tabuleiro] = {casa: INICIAL for casa in casas_livres}
         
         if np.random.uniform(0, 1) < self.taxa_exploracao:
             # Executa ação randômica de acordo com a taxa de exploração
             # se a taxa de exploração for 0.0 então todas as ações virão da
             # política
-            jogada = np.random.choice(casasLivres)
+            jogada = np.random.choice(casas_livres)
         else:
             # Escolhe uma das alternativas que maximizam q
             # jogada_max é uma das jogadas com q maior (pode haver mais de uma com o mesmo valor máximo)
@@ -408,14 +409,14 @@ class Maquina():
             jogada = sample(alternativas, 1)[0]
             if self.depuracao:
                 print(hash_tabuleiro, jogada_max, valor_max, self.q[hash_tabuleiro])            
-        self.acrescentaEstado(copia_tabuleiro, jogada)
+        self.acrescenta_estado(copia_tabuleiro, jogada)
         return jogada
     
-    def acrescentaEstado(self, tabuleiro, jogada):
+    def acrescenta_estado(self, tabuleiro, jogada):
         """Acrescenta um estado na lista, usado durante o treinamento
         para representar os lances jogados durante a partida
         """
-        hash_tabuleiro = geraHashTabuleiro(tabuleiro)
+        hash_tabuleiro = gera_hash_tabuleiro(tabuleiro)
         self.estados.append({'posicao': hash_tabuleiro, 'jogada': jogada})
 
     def maxq(self, estado):
@@ -423,7 +424,7 @@ class Maquina():
         max_index = max(self.q[estado], key=self.q[estado].get)
         return self.q[estado][max_index]
 
-    def propagaRecompensa(self, recompensa):
+    def propaga_recompensa(self, recompensa):
         """Propaga a recompensa pelos estados do jogo atual
         É o principal processo do reinforcement learning
         Perceba que os estados são percorridos de trás para frente, ou seja,
@@ -443,7 +444,7 @@ class Maquina():
         a = estados[i+1]['jogada']
         self.q[s][a] += self.taxa_aprendizado * (recompensa + self.gama * recompensa - self.q[s][a])
 
-    def salvaPolitica(self, prefixo=PREFIXO_POLITICA):
+    def salva_politica(self, prefixo=PREFIXO_POLITICA):
         """Salva uma política para uso futuro"""
         pasta = Path(f'./{PASTA_POLITICAS}')
         if not pasta.exists():
@@ -455,7 +456,7 @@ class Maquina():
         else:
             raise ValueError(f"Não consigo criar arquivos em {pasta}")
 
-    def carregaPolitica(self, politica, prefixo=PREFIXO_POLITICA):
+    def carrega_politica(self, politica, prefixo=PREFIXO_POLITICA):
         """Carrega uma política para jogar ou continuar um treinamento"""
         pasta = Path(f'./{PASTA_POLITICAS}')
         nome_arquivo = pasta / f'{prefixo}{politica}.{EXTENSAO_POLITICA}'
@@ -465,7 +466,7 @@ class Maquina():
         else:
             raise ValueError(f"Política {politica} não existe!")
 
-    def combinaESalvaPolitica(self, politica2, nome, prefixo=PREFIXO_POLITICA):
+    def combina_e_salva_politica(self, politica2, nome, prefixo=PREFIXO_POLITICA):
         """Combina duas políticas em uma e salva tabela q
         O objetivo é combinar duas políticas, uma para X e uma para O em uma só política, já que as
         tuplas (hashTabuleiro, valor) são mutualmente excludentes nas políticas para X e O
@@ -489,16 +490,16 @@ class Humano:
         self.nome = nome
         self.tipo = "Humano"
     
-    def escolheJogada(self, casasLivres):
+    def escolhe_jogada(self, casas_livres):
         """Pergunta qual o lance a fazer
         Recomendável que a partida seja chamada com saida == True
         se esta envolver pelo menos um jogador humano
         """
         while True:
-            print(f"Qual a sua jogada, {self.nome}? ", end='')
+            print(f"Qual a sua jogada, {self.nome}? ", end='', flush=True)
             acao = int(input())
-            print(f"{self.nome} jogou {acao}")
-            if acao in casasLivres:
+            #print(f"{self.nome} jogou {acao}")
+            if acao in casas_livres:
                 return acao
 
     def reinicia(self):
@@ -515,12 +516,12 @@ if __name__ == "__main__":
     print("Treinando...")
     treinamento.treinamento(10000)
     # Salva as políticas geradas
-    politicaX.salvaPolitica()
-    politicaO.salvaPolitica()
+    politicaX.salva_politica()
+    politicaO.salva_politica()
 
     # Carrega uma politica salva e joga contra um humano
     politicaX = Maquina("Computador", taxa_exploracao=0.0)
-    politicaX.carregaPolitica("X")
+    politicaX.carrega_politica("X")
     humano = Humano("Walter")
     jogo = jogoDaVelha(politicaX, humano)
-    jogo.partida()
+    jogo.partida(saida=True)
