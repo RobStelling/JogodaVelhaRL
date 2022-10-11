@@ -93,6 +93,7 @@ VITORIA = 2.0
 DERROTA = -1.0
 VELHAX = 0.1
 VELHAO = 1.0
+LANCE = -0.05
 
 # Atributos dos nomes dos arquivos de política ao serem salvos
 # Ex: {PASTA_POLITICAS}/{PREFIXO_POLITICA}{nome_política}.{EXTENSAO_POLITICA}
@@ -245,14 +246,14 @@ class jogoDaVelha:
             while True:
                 alternativas = self.casas_livres()
                 vez = self.vez
-                jogada = self.jogador[vez].escolhe_jogada(alternativas, self.tabuleiro, vez)
+                jogada = self.jogador[vez].escolhe_jogada(alternativas, self.tabuleiro)
                 self.jogada(jogada)
                 # Se o jogo terminou (X venceu, O venceu ou velha)
                 # propaga as recompensas pelos estados,
                 # reinicia jogo e jogadores e volta ao loop de treinamento
                 resultado = self.resultado()
                 if resultado is not None:
-                    self.recompensa(resultado)
+                    self.recompensa(resultado, NUM_CASAS - len(alternativas) + 1)
                     self.reinicia()
                     break
 
@@ -271,19 +272,25 @@ class jogoDaVelha:
         self.tabuleiro[casa] = self.vez
         self.vez = troca[self.vez]
 
-    def recompensa(self, resultado):
+    def recompensa(self, resultado, total_jogadas):
         """Passa as recompensas para as políticas de acordo com o resultado do jogo
         As recompensas são propagadas nas políticas de cada jogador a partir dos seus lances nessa instância do jogo
+        resultado: resultado do jogo (XGANHOU, OGANHOU, VELHA
+        num_lances: número de lances da partida, importante para o desconto de número de lances, já que queremos que os
+                    agentes descubram as vitórias mais curtas sempre que possível
+        O jogador que fez o último movimento pode ser inferido pelo resultado, se XGANHOU, então foi X,
+        se OGANHOU, então foi O, e se deu velha, foi X, já que X sempre começa. O número de movimentos é sempre ímpar depois
+        de X jogar e par depois de O jogar.
         """
         if resultado == XGANHOU:
-            self.jogador[X].propaga_recompensa(VITORIA)
-            self.jogador[O].propaga_recompensa(DERROTA)
+            self.jogador[X].propaga_recompensa(VITORIA + total_jogadas * LANCE)
+            self.jogador[O].propaga_recompensa(DERROTA + (NUM_CASAS - total_jogadas) * LANCE)
         elif resultado == OGANHOU:
-            self.jogador[X].propaga_recompensa(DERROTA)
-            self.jogador[O].propaga_recompensa(VITORIA)
-        else: # Deu velha
-            self.jogador[X].propaga_recompensa(VELHAX)
-            self.jogador[O].propaga_recompensa(VELHAO)
+            self.jogador[X].propaga_recompensa(DERROTA + total_jogadas * LANCE)
+            self.jogador[O].propaga_recompensa(VITORIA + (NUM_CASAS - total_jogadas) * LANCE)
+        else: # Deu velha, X jogou 5 vezes, O jogou 4 vezes
+            self.jogador[X].propaga_recompensa(VELHAX + NUM_CASAS * LANCE)
+            self.jogador[O].propaga_recompensa(VELHAO + NUM_CASAS * LANCE)
 
     def partida(self, saida=True):
         """Jogo entre dois jogadores
