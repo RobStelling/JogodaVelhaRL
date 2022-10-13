@@ -80,7 +80,7 @@ NUM_CASAS = LINHAS * COLUNAS
 # TAXA_APRENDIZADO: (ALFA) é o peso entre o valor do estado atual e o valor da recompensa
 # GAMA: Desconto dado à recompensa
 # LIMITE_EXPLORACAO: Limite máximo entre a melhor ação e ações alternativas para um determinado estado
-TAXA_EXPLORACAO = 0.3
+TAXA_EXPLORACAO = 0.1
 TAXA_APRENDIZADO = 0.2
 GAMA = 0.9
 LIMITE_EXPLORACAO = 0.0
@@ -245,8 +245,7 @@ class jogoDaVelha:
                 print(f"Rodadas: {rodada}")
             while True:
                 alternativas = self.casas_livres()
-                vez = self.vez
-                jogada = self.jogador[vez].escolhe_jogada(alternativas, self.tabuleiro)
+                jogada = self.jogador[self.vez].escolhe_jogada(alternativas, self.tabuleiro)
                 self.jogada(jogada)
                 # Se o jogo terminou (X venceu, O venceu ou velha)
                 # propaga as recompensas pelos estados,
