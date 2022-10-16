@@ -49,6 +49,7 @@ import pickle
 
 from collections import Counter
 from copy import deepcopy
+from IPython.display import display
 from pathlib import Path
 from random import sample
 
@@ -234,15 +235,20 @@ class jogoDaVelha:
             self.terminou = True
         return estado
 
-    def treinamento(self, rodadas=1000, verifica=100):
+    def treinamento(self, rodadas=1000, verifica=100, progresso=None):
         """Executa o loop de treinamento
         Recebe como parâmetros opcionais o número de rodadas e de quantas em quantas rodadas o treinamento
         deve ser verificado
         Enquanto o treinamento é realizado as políticas para X e O são atualizadas com recompensas pré-determinadas
         """
+        if progresso is not None:
+            display(progresso)
         for rodada in range(rodadas):
             if rodada % verifica == 0:
-                print(f"Rodadas: {rodada}")
+                if progresso is not None:
+                    progresso.value = (rodada+1)/rodadas
+                else:
+                    print(f"Rodadas: {rodada}")
             while True:
                 alternativas = self.casas_livres()
                 jogada = self.jogador[self.vez].escolhe_jogada(alternativas, self.tabuleiro)
@@ -255,6 +261,9 @@ class jogoDaVelha:
                     self.recompensa(resultado, NUM_CASAS - len(alternativas) + 1)
                     self.reinicia()
                     break
+
+        if progresso is not None:
+            progresso.value = 1.0
 
         print(f"Treinamento finalizado: {rodadas} rodadas")
 
